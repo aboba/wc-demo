@@ -73,10 +73,19 @@ class pipeline {
        transform(chunk, controller) {
        //Serialize the chunk
        this.chunk_counter++;
-       //serializedChunk:
-       // null transformation for now
-         let serializedChunk = chunk;
-         controller.enqueue(serializedChunk);
+       let frame = 
+       {
+         seqNo: this.chunk_counter,
+         isKey: chunk.type == 'key',
+         tid: chunk.temporalLayerId,
+         timestamp: chunk.timestamp,
+         duration: chunk.duration,
+         length: chunk.byteLength,
+         data: new Uint8Array(chunk.data)
+       };
+       //TODO: Serialize the frame
+       //TODO: Null transform for now.  Replace this with the binary wireformat
+         controller.enqueue(chunk);
        }
      });
    }
@@ -87,7 +96,7 @@ class pipeline {
        },
        transform(chunk, controller) {
          //Deserialize the chunk
-         //Null transformation for now
+         //TODO: Null tranform for now. Replace this with wire format transformation
          let deSerializedChunk = chunk;
          controller.enqueue(deSerializedChunk);
        }
@@ -119,10 +128,15 @@ class pipeline {
          this.frame_counter = 0;
          this.pending_outputs = 0;
          this.encoder = new VideoEncoder({
-           output: (chunk, {decoderConfig}) => {
-             if (decoderConfig) {
+           output: (chunk, cfg) => {
+             if (cfg.decoderConfig) {
                this.context.postMessage('Decoder reconfig!');
-               decoder.configure(decoderConfig);
+               this.context.postMessage('Configuration: ' + JSON.stringify(cfg.decoderConfig));
+               decoder.configure(cfg.decoderConfig);
+             }
+             chunk.temporalLayerId = 0;
+             if (cfg.temporalLayerId) {
+               chunk.temporalLayerId = cfg.temporalLayerId;
              }
              this.pending_outputs--;
              controller.enqueue(chunk);
@@ -148,7 +162,6 @@ class pipeline {
          })
        },
        transform(frame, controller) {
-         // Processing on 'frame' goes here!
          if (this.pending_outputs <= 30) {
            if (++this.frame_counter % 20 == 0) {
              this.context.postMessage("Encoded 20 frames");
