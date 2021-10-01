@@ -2,53 +2,51 @@
 
 var encoder;
 var decoder;
+var pl;
 
 self.addEventListener('message', async function(e) {
   // In this demo, we expect at most two messages, one of each type.
   var type = e.data.type;
 
   if (type == "stop") {
-    self.postMessage('Stop message received.');
-    if (typeof(pl)  !== 'undefined') {
-      self.postMessage("Cleaning up pipeline.");
-      pl.stop();
-    }
+    self.postMessage({text: 'Stop message received.'});
+    pl.stop();
     return;
   } else if (type !== "stream"){
-    self.postMessage("Invalid message received.");
+    self.postMessage({severity: 'fatal', text: 'Invalid message received.'});
     return;
   }
   // We received a "stream" event
 
-  self.postMessage("Stream event received.");
+  self.postMessage({text: 'Stream event received.'});
 
   // Create WebTransport
   var transport;
 
   try {
     transport = new WebTransport(e.data.url);
-    self.postMessage('Initiating connection...');
+    self.postMessage({text: 'Initiating connection...'});
   } catch (e) {
-    self.postMessage('Failed to create connection object: ' + e.message);
+    self.postMessage({severity: 'fatal', text: 'Failed to create connection object: ' + e.message});
     return;
   }
 
   transport.ready
     .then(() => {
-       self.postMessage('Connection ready.');
-       var pl = new pipeline(e.data, transport, self);
+       self.postMessage({text: 'Connection ready.'});
+       pl = new pipeline(e.data, transport, self);
        pl.start(self);
     })
     .catch((e) => {
-       self.postMessage('Connection failed: ' + e.message)
+       self.postMessage({severity: 'fatal', text: 'Connection failed: ' + e.message})
        return;
     })
 
   transport.closed
-    .then(()   => self.postMessage('Connection closed normally.'))
+    .then(()   => self.postMessage({text: 'Connection closed normally.'}))
     .catch((e) => {
-      self.postMessage('Connection closed abruptly: ' + e.message);
-      if (typeof(pl)  !== 'undefined') pl.stop();
+      self.postMessage({severity: 'fatal', text: 'Connection closed abruptly: ' + e.message});
+      pl.stop();
       return;
     })
 
@@ -110,13 +108,14 @@ class pipeline {
          this.decoder = decoder = new VideoDecoder({
            output: frame => controller.enqueue(frame),
            error: (e) => {
-              this.context.postMessage(`Decoder error: ${e.message}`);
-              this.stop();
+              this.context.postMessage({severity: 'fatal', text: `Decoder error: ${e.message}`});
            }
          });
        },
        transform(chunk, controller) {
-         this.decoder.decode(chunk);
+         if (this.decoder.state != "closed") {
+           this.decoder.decode(chunk);
+         }
        }
      });
    }
@@ -127,11 +126,11 @@ class pipeline {
          this.context = context;
          this.frame_counter = 0;
          this.pending_outputs = 0;
-         this.encoder = new VideoEncoder({
+         this.encoder = encoder = new VideoEncoder({
            output: (chunk, cfg) => {
              if (cfg.decoderConfig) {
-               this.context.postMessage('Decoder reconfig!');
-               this.context.postMessage('Configuration: ' + JSON.stringify(cfg.decoderConfig));
+               this.context.postMessage({text: 'Decoder reconfig!'});
+               this.context.postMessage({text: 'Configuration: ' + JSON.stringify(cfg.decoderConfig)});
                decoder.configure(cfg.decoderConfig);
              }
              chunk.temporalLayerId = 0;
@@ -142,37 +141,36 @@ class pipeline {
              controller.enqueue(chunk);
            },
            error: (e) => {
-             this.context.postMessage(`Encoder error: ${e.message}`);
-             this.stop();
+             this.context.postMessage({severity: 'fatal', text: `Encoder error: ${e.message}`});
            }
          });
          VideoEncoder.isConfigSupported(config).then((encoderSupport) => {
            if(encoderSupport.supported) {
              this.encoder.configure(encoderSupport.config);
-             this.context.postMessage('Encoder successfully configured:\n' + JSON.stringify(encoderSupport.config));
-             this.context.postMessage('Encoder state: ' + JSON.stringify(this.encoder.state));
+             this.context.postMessage({text: 'Encoder successfully configured:\n' + JSON.stringify(encoderSupport.config)});
+             this.context.postMessage({text: 'Encoder state: ' + JSON.stringify(this.encoder.state)});
            } else {
-             this.context.postMessage('Config not supported:\n' + JSON.stringify(encoderSupport.config));
+             this.context.postMessage({severity: 'fatal', text: 'Config not supported:\n' + JSON.stringify(encoderSupport.config)});
              this.stop();
            }
          })
          .catch((e) => {
-            this.context.postMessage('Configuration error: ' + e.message);
-            this.stop();
+            this.context.postMessage({severity: 'fatal', text: 'Configuration error: ' + e.message});
          })
        },
        transform(frame, controller) {
          if (this.pending_outputs <= 30) {
            if (++this.frame_counter % 20 == 0) {
-             this.context.postMessage("Encoded 20 frames");
+             this.context.postMessage({text: 'Encoded 20 frames'});
            }
            this.pending_outputs++;
            const insert_keyframe = (this.frame_counter % config.keyInterval) == 0;
            try {
-             this.encoder.encode(frame, { keyFrame: insert_keyframe });
+             if (this.encoder.state != "closed") {
+               this.encoder.encode(frame, { keyFrame: insert_keyframe });
+             }
            } catch(e) {
-             this.context.postMessage("Encoder Error: " + e.message);
-             this.stop();
+             this.context.postMessage({severity: 'fatal', text: 'Encoder Error: ' + e.message});
            }
          }
          frame.close();
@@ -182,17 +180,13 @@ class pipeline {
 
    stop() {
      this.stopped = true;
-     this.context.postMessage('stop() called');
+     this.context.postMessage({text: 'stop() called'});
      // TODO: There might be a more elegant way of closing a stream, or other
      // events to listen for.
-     this.frameReader.releaseLock();
-     this.inputStream.cancel();
-     this.frameWriter.releaseLock();
-     this.outputStream.abort();
-     if (this.encoder.state != "closed") this.encoder.close();
-     if (this.decoder.state != "closed") this.decoder.close();
+     if (encoder.state != "closed") encoder.close();
+     if (decoder.state != "closed") decoder.close();
      this.transport.close();
-     this.context.postMessage("stop(): streams, reader, writer, frame, transport and encoder closed");
+     this.context.postMessage({text: "stop(): transport, frame, encoder and decoder closed"});
      return;
    }
 
@@ -206,7 +200,7 @@ class pipeline {
            .pipeThrough(this.DecodeVideoStream(this.context))
            .pipeTo(this.outputStream);
      } catch (e) {
-       this.context.postMessage('start error: ' + e.message);
+       this.context.postMessage({severity: 'fatal', text: 'start error: ' + e.message});
      }
    }
 }

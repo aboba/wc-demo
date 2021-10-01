@@ -1,12 +1,14 @@
 'use strict';
 
 var preferredResolution;
+let bitrate = 1000000;
 var preferredCodec ="VP8";
 var mode = "L1T3";
 var hw = "no-preference";
 var streamWorker;
 var constraints;
-var log = document.querySelector('textarea');  
+var inputStream, outputStream;
+var rate = document.querySelector('#rate');
 var connectButton = document.querySelector('#connect');
 var stopButton = document.querySelector('#stop');
 var codecButtons = document.querySelector('#codecButtons');
@@ -16,46 +18,52 @@ var hwButtons = document.querySelector('#hwButtons');
 connectButton.disabled = false;
 stopButton.disabled = true;
 
+function addToEventLog(text, severity = 'info') {
+  let log = document.querySelector('textarea');
+  log.value += 'log-' + severity + ': ' + text + '\n';
+}
+
 function getResValue(radio) {
   preferredResolution = radio.value;
-  log.value += ' Resolution selected: ' + preferredResolution + '\n';
+  addToEventLog('Resolution selected: ' + preferredResolution);
 }
 
 function getCodecValue(radio) {
   preferredCodec = radio.value;
-  log.value += ' Codec selected: ' + preferredCodec + '\n';
+  addToEventLog('Codec selected: ' + preferredCodec);
 }
 
 function getModeValue(radio) {
   mode = radio.value;
-  log.value += ' Mode selected: ' + mode + '\n';
+  addToEventLog('Mode selected: ' + mode);
 }
 
 function getHwValue(radio) {
   hw = radio.value;
-  log.value += ' Hardware Acceleration preference: ' + hw + '\n';
+  addToEventLog('Hardware Acceleration preference: ' + hw);
 }
 
 function stop() {
   stopButton.disabled = true;
   connectButton.disabled = true;
   streamWorker.postMessage({ type: "stop" });
+  inputStream.cancel();
+  outputStream.abort(); 
+  addToEventLog('stop(): input stream cancelled and output stream aborted');
 }
 
 document.addEventListener('DOMContentLoaded', function(event) {
-  log.value += 'DOM Content Loaded\n' ;
+  addToEventLog('DOM Content Loaded');
 
   if (typeof MediaStreamTrackProcessor === 'undefined' ||
       typeof MediaStreamTrackGenerator === 'undefined') {
-    log.value +=
-        'Your browser does not support the experimental Mediacapture-transform API.\n' +
-        'Please launch with the --enable-blink-features=WebCodecs,MediaStreamInsertableStreams flag\n';
+    addToEventLog('Your browser does not support the experimental Mediacapture-transform API.\n' +
+        'Please launch with the --enable-blink-features=WebCodecs,MediaStreamInsertableStreams flag','fatal');
     return;
   }
 
   if (typeof WebTransport === 'undefined') {
-    log.value +=
-        'Your browser does not support the WebTransport API.\n';
+    addToEventLog('Your browser does not support the WebTransport API.', 'fatal');
     return;
   }
 
@@ -64,7 +72,7 @@ document.addEventListener('DOMContentLoaded', function(event) {
 
   // Print messages from the worker in the text area.
   streamWorker.addEventListener('message', function(e) {
-    log.value += 'Worker msg: ' + e.data + '\n';
+    addToEventLog('Worker msg: ' + e.data.text, e.data.severity);
   }, false);
 
   const qvgaConstraints   = { video: {width: {exact: 320},  height: {exact: 240}}};
@@ -76,7 +84,7 @@ document.addEventListener('DOMContentLoaded', function(event) {
   const eightKConstraints = { video: {width: {exact: 7680}, height: {exact: 4320}}};
 
   stopButton.onclick = () => {
-    log.value += 'Stop button clicked.\n';
+    addToEventLog('Stop button clicked.');
     stop();
   }
 
@@ -87,39 +95,40 @@ document.addEventListener('DOMContentLoaded', function(event) {
     codecButtons.style.display = "none";
     resButtons.style.display = "none";
     modeButtons.style.display = "none";
+    rateInput.style.display = "none";
 
     switch(preferredResolution) {
        case "qvga":
          constraints = qvgaConstraints;
-         log.value += "QVGA selected\n";
+         addToEventLog('QVGA selected');
          break;
        case "vga":
          constraints = vgaConstraints;
-         log.value += "VGA selected\n";
+         addToEventLog('VGA selected');
          break;
        case "hd":
          constraints = hdConstraints;
-         log.value += "HD selected\n";
+         addToEventLog('HD selected');
          break;
        case "full-hd":
          constraints = fullHdConstraints;
-         log.value += "Full HD selected\n";
+         addToEventLog('Full HD selected');
          break;
        case "tv4K":
          constraints = tv4KConstraints;
-         log.value += "4K TV selected\n";
+         addToEventLog('4K TV selected');
          break;
        case "cinema4K":
          constraints = cinema4KConstraints;
-         log.value += "Cinema 4K selected\n";
+         addToEventLog('Cinema 4K selected');
          break;
        case "eightK":
          constraints = eightKConstraints;
-         log.value += "8K selected\n";
+         addToEventLog('8K selected');
          break;
        default:
          constraints = qvgaConstraints;
-         log.value += "Default (QVGA) selected\n";
+         addToEventLog('Default (QVGA) selected');
          break;
     }
     getMedia(constraints);
@@ -136,18 +145,20 @@ async function getMedia(constraints) {
     // Collect the WebTransport URL
     const url = document.getElementById('url').value;
 
+    // Collect the bitrate
+    const rate = document.getElementById('rate').value;
+
     // Create a MediaStreamTrackProcessor, which exposes frames from the track
     // as a ReadableStream of VideoFrames.
-    var [track] = mediaStream.getVideoTracks();
-    var ts = track.getSettings();
-    var processor = new MediaStreamTrackProcessor(track);
-    var inputStream = processor.readable;
-
+    let [track] = mediaStream.getVideoTracks();
+    let ts = track.getSettings();
+    const processor = new MediaStreamTrackProcessor(track);
+    inputStream = processor.readable;
 
     // Create a MediaStreamTrackGenerator, which exposes a track from a
     // WritableStream of VideoFrames.
     const generator = new MediaStreamTrackGenerator({kind: 'video'});
-    const outputStream = generator.writable;
+    outputStream = generator.writable;
     document.getElementById('outputVideo').srcObject = new MediaStream([generator]);
 
     //Create video Encoder configuration
@@ -155,7 +166,6 @@ async function getMedia(constraints) {
        keyInterval: 150,
        resolutionScale: 1,
        framerateScale: 1.0,
-       bitrate: 100000
     };
 
     const config = {
@@ -166,7 +176,7 @@ async function getMedia(constraints) {
       width: ts.width/vConfig.resolutionScale,
       height: ts.height/vConfig.resolutionScale,
       hardwareAcceleration: hw,
-      bitrate: vConfig.bitrate,
+      bitrate: rate, 
       framerate: ts.frameRate/vConfig.framerateScale,
       keyInterval: vConfig.keyInterval
     };
@@ -188,7 +198,7 @@ async function getMedia(constraints) {
            break;
        case "AV1":
            config.codec = "av01."
-           log.value += ('AV1 Encoding not supported yet\n');
+           addToEventLog('AV1 Encoding not supported yet', 'fatal');
            stop();
            return;
     }
@@ -199,7 +209,7 @@ async function getMedia(constraints) {
     streamWorker.postMessage({ type: "stream", config: config, url: url, streams: {input: inputStream, output: outputStream}}, [inputStream, outputStream]);
 
   } catch(e) {
-     log.value += e.name + ": " + e.message; 
+     addToEventLog(e.name + ": " + e.message, 'fatal');
   }
 }
 
