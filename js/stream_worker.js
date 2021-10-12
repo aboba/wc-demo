@@ -135,7 +135,7 @@ SSRC = this.config.ssrc
        result.set(new Uint8Array(chunk.data), hdr.byteLength);
        controller.enqueue(result.buffer);
  */
-       controller.enequeue(chunk);
+       controller.enqueue(chunk);
       }
      });
    }
