@@ -163,11 +163,15 @@ async function getMedia(constraints) {
 
     //Create video Encoder configuration
     const vConfig = {
-       keyInterval: 150,
+       keyInterval: 140,
        resolutionScale: 1,
        framerateScale: 1.0,
     };
-
+   
+    let ssrcArr = new Uint32Array(1);
+    window.crypto.getRandomValues(ssrcArr);
+    const ssrc = ssrcArr[0];
+  
     const config = {
       alpha: "discard",
       latencyMode: "realtime",
@@ -178,7 +182,8 @@ async function getMedia(constraints) {
       hardwareAcceleration: hw,
       bitrate: rate, 
       framerate: ts.frameRate/vConfig.framerateScale,
-      keyInterval: vConfig.keyInterval
+      keyInterval: vConfig.keyInterval,
+      ssrc:  ssrc
     };
 
     if (mode != "L1T1") {
@@ -189,19 +194,24 @@ async function getMedia(constraints) {
        case "H264":
           config.codec = "avc1.42001E";
           config.avc = { format: "annexb" };
+          config.pt = 1;
           break;
        case "VP8":
           config.codec = "vp8";
+          config.pt = 2;
           break;
        case "VP9":
            config.codec = "vp09.00.10.08";
+           config.pt = 3;
            break;
        case "AV1":
            config.codec = "av01."
+           config.pt = 4;
            addToEventLog('AV1 Encoding not supported yet', 'fatal');
            stop();
            return;
     }
+    
 
     // Transfer the readable stream to the worker, as well as other info from the user interface.
     // NOTE: transferring frameStream and reading it in the worker is more
