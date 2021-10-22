@@ -132,95 +132,95 @@ document.addEventListener('DOMContentLoaded', function(event) {
          break;
     }
     getMedia(constraints);
-}
+  }
 
-async function getMedia(constraints) {
-  try {
-    // Get a MediaStream from the webcam.
-    const mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
+  async function getMedia(constraints) {
+    try {
+      // Get a MediaStream from the webcam.
+      const mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
 
-    // Connect the webcam stream to the video element.
-    document.getElementById('inputVideo').srcObject = mediaStream;
+      // Connect the webcam stream to the video element.
+      document.getElementById('inputVideo').srcObject = mediaStream;
 
-    // Collect the WebTransport URL
-    const url = document.getElementById('url').value;
+      // Collect the WebTransport URL
+      const url = document.getElementById('url').value;
 
-    // Collect the bitrate
-    const rate = document.getElementById('rate').value;
+      // Collect the bitrate
+      const rate = document.getElementById('rate').value;
 
-    // Create a MediaStreamTrackProcessor, which exposes frames from the track
-    // as a ReadableStream of VideoFrames.
-    let [track] = mediaStream.getVideoTracks();
-    let ts = track.getSettings();
-    const processor = new MediaStreamTrackProcessor(track);
-    inputStream = processor.readable;
+      // Create a MediaStreamTrackProcessor, which exposes frames from the track
+      // as a ReadableStream of VideoFrames.
+      let [track] = mediaStream.getVideoTracks();
+      let ts = track.getSettings();
+      const processor = new MediaStreamTrackProcessor(track);
+      inputStream = processor.readable;
 
-    // Create a MediaStreamTrackGenerator, which exposes a track from a
-    // WritableStream of VideoFrames.
-    const generator = new MediaStreamTrackGenerator({kind: 'video'});
-    outputStream = generator.writable;
-    document.getElementById('outputVideo').srcObject = new MediaStream([generator]);
+      // Create a MediaStreamTrackGenerator, which exposes a track from a
+      // WritableStream of VideoFrames.
+      const generator = new MediaStreamTrackGenerator({kind: 'video'});
+      outputStream = generator.writable;
+      document.getElementById('outputVideo').srcObject = new MediaStream([generator]);
 
-    //Create video Encoder configuration
-    const vConfig = {
-       keyInterval: 140,
-       resolutionScale: 1,
-       framerateScale: 1.0,
-    };
+      //Create video Encoder configuration
+      const vConfig = {
+         keyInterval: 120,
+         resolutionScale: 1,
+         framerateScale: 1.0,
+      };
    
-    let ssrcArr = new Uint32Array(1);
-    window.crypto.getRandomValues(ssrcArr);
-    const ssrc = ssrcArr[0];
+      let ssrcArr = new Uint32Array(1);
+      window.crypto.getRandomValues(ssrcArr);
+      const ssrc = ssrcArr[0];
   
-    const config = {
-      alpha: "discard",
-      latencyMode: "realtime",
-      bitrateMode: "variable",
-      codec: preferredCodec,
-      width: ts.width/vConfig.resolutionScale,
-      height: ts.height/vConfig.resolutionScale,
-      hardwareAcceleration: hw,
-      bitrate: rate, 
-      framerate: ts.frameRate/vConfig.framerateScale,
-      keyInterval: vConfig.keyInterval,
-      ssrc:  ssrc
-    };
+      const config = {
+        alpha: "discard",
+        latencyMode: "realtime",
+        bitrateMode: "variable",
+        codec: preferredCodec,
+        width: ts.width/vConfig.resolutionScale,
+        height: ts.height/vConfig.resolutionScale,
+        hardwareAcceleration: hw,
+        bitrate: rate, 
+        framerate: ts.frameRate/vConfig.framerateScale,
+        keyInterval: vConfig.keyInterval,
+        ssrc:  ssrc
+      };
 
-    if (mode != "L1T1") {
-       config.scalabilityMode = mode;
-    }
+      if (mode != "L1T1") {
+        config.scalabilityMode = mode;
+      }
 
-    switch(preferredCodec){
-       case "H264":
+      switch(preferredCodec){
+        case "H264":
           config.codec = "avc1.42001E";
           config.avc = { format: "annexb" };
           config.pt = 1;
           break;
-       case "VP8":
+        case "VP8":
           config.codec = "vp8";
           config.pt = 2;
           break;
-       case "VP9":
+        case "VP9":
            config.codec = "vp09.00.10.08";
            config.pt = 3;
            break;
-       case "AV1":
+        case "AV1":
            config.codec = "av01."
            config.pt = 4;
            addToEventLog('AV1 Encoding not supported yet', 'fatal');
            stop();
            return;
-    }
+      }
     
 
-    // Transfer the readable stream to the worker, as well as other info from the user interface.
-    // NOTE: transferring frameStream and reading it in the worker is more
-    // efficient than reading frameStream here and transferring VideoFrames individually.
-    streamWorker.postMessage({ type: "stream", config: config, url: url, streams: {input: inputStream, output: outputStream}}, [inputStream, outputStream]);
+      // Transfer the readable stream to the worker, as well as other info from the user interface.
+      // NOTE: transferring frameStream and reading it in the worker is more
+      // efficient than reading frameStream here and transferring VideoFrames individually.
+      streamWorker.postMessage({ type: "stream", config: config, url: url, streams: {input: inputStream, output: outputStream}}, [inputStream, outputStream]);
 
-  } catch(e) {
-     addToEventLog(e.name + ": " + e.message, 'fatal');
+    } catch(e) {
+       addToEventLog(e.name + ": " + e.message, 'fatal');
+    }
   }
-}
 
 }, false);
