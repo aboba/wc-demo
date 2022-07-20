@@ -1,9 +1,11 @@
 'use strict';
 
 var preferredResolution;
-let bitrate = 1000000;
+let bitrate = 3000000;
+var stopped = false;
 var preferredCodec ="VP8";
 var mode = "L1T3";
+var latencyPref = "realtime";
 var hw = "no-preference";
 var streamWorker;
 var constraints;
@@ -21,11 +23,17 @@ stopButton.disabled = true;
 function addToEventLog(text, severity = 'info') {
   let log = document.querySelector('textarea');
   log.value += 'log-' + severity + ': ' + text + '\n';
+  if (severity == 'fatal') stop();
 }
 
 function getResValue(radio) {
   preferredResolution = radio.value;
   addToEventLog('Resolution selected: ' + preferredResolution);
+}
+
+function getPrefValue(radio) {
+   latencyPref = radio.value;
+   addToEventLog('Latency preference selected: ' + latencyPref);
 }
 
 function getCodecValue(radio) {
@@ -44,6 +52,7 @@ function getHwValue(radio) {
 }
 
 function stop() {
+  stopped = true;
   stopButton.disabled = true;
   connectButton.disabled = true;
   streamWorker.postMessage({ type: "stop" });
@@ -53,6 +62,7 @@ function stop() {
 }
 
 document.addEventListener('DOMContentLoaded', function(event) {
+  if (stopped) return;
   addToEventLog('DOM Content Loaded');
 
   if (typeof MediaStreamTrackProcessor === 'undefined' ||
@@ -62,14 +72,9 @@ document.addEventListener('DOMContentLoaded', function(event) {
     return;
   }
 
-  if (typeof WebTransport === 'undefined') {
-    addToEventLog('Your browser does not support the WebTransport API.', 'fatal');
-    return;
-  }
-
   // Create a new worker.
   streamWorker = new Worker("js/stream_worker.js");
-
+  addToEventLog('Worker created.');
   // Print messages from the worker in the text area.
   streamWorker.addEventListener('message', function(e) {
     addToEventLog('Worker msg: ' + e.data.text, e.data.severity);
@@ -92,10 +97,12 @@ document.addEventListener('DOMContentLoaded', function(event) {
     connectButton.disabled = true;
     stopButton.disabled = false;
     hwButtons.style.display = "none";
+    prefButtons.style.display = "none";
     codecButtons.style.display = "none";
     resButtons.style.display = "none";
     modeButtons.style.display = "none";
     rateInput.style.display = "none";
+    keyInput.style.display = "none";
 
     switch(preferredResolution) {
        case "qvga":
@@ -135,6 +142,8 @@ document.addEventListener('DOMContentLoaded', function(event) {
   }
 
   async function getMedia(constraints) {
+    if (stopped) return;
+    addToEventLog('getMedia called'); 
     try {
       // Get a MediaStream from the webcam.
       const mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
@@ -142,11 +151,11 @@ document.addEventListener('DOMContentLoaded', function(event) {
       // Connect the webcam stream to the video element.
       document.getElementById('inputVideo').srcObject = mediaStream;
 
-      // Collect the WebTransport URL
-      const url = document.getElementById('url').value;
-
       // Collect the bitrate
       const rate = document.getElementById('rate').value;
+
+      // Collect the keyframe gap
+      const keygap = document.getElementById('keygap').value;
 
       // Create a MediaStreamTrackProcessor, which exposes frames from the track
       // as a ReadableStream of VideoFrames.
@@ -163,7 +172,7 @@ document.addEventListener('DOMContentLoaded', function(event) {
 
       //Create video Encoder configuration
       const vConfig = {
-         keyInterval: 120,
+         keyInterval: keygap,
          resolutionScale: 1,
          framerateScale: 1.0,
       };
@@ -174,7 +183,7 @@ document.addEventListener('DOMContentLoaded', function(event) {
   
       const config = {
         alpha: "discard",
-        latencyMode: "realtime",
+        latencyMode: latencyPref,
         bitrateMode: "variable",
         codec: preferredCodec,
         width: ts.width/vConfig.resolutionScale,
@@ -192,35 +201,41 @@ document.addEventListener('DOMContentLoaded', function(event) {
 
       switch(preferredCodec){
         case "H264":
-          config.codec = "avc1.42001E";
+          config.codec = "avc1.42002A";  // baseline profile, level 4.2
           config.avc = { format: "annexb" };
           config.pt = 1;
           break;
+        case "H265":
+          config.codec = "hvc1.2.4.L123.00"; // Main 10 profile, level 4.1, main Tier
+       // config.codec = "hvc1.1.6.L123.00"  // Main profile, level 4.1, main Tier
+          config.hevc = { format: "annexb" };
+          config.pt = 2;
+          //addToEventLog('HEVC Encoding not supported yet', 'fatal');
+          //stop();
+          //return;
+          break;
         case "VP8":
           config.codec = "vp8";
-          config.pt = 2;
+          config.pt = 3;
           break;
         case "VP9":
            config.codec = "vp09.00.10.08";
-           config.pt = 3;
+           config.pt = 4;
            break;
         case "AV1":
-           config.codec = "av01."
-           config.pt = 4;
-           addToEventLog('AV1 Encoding not supported yet', 'fatal');
-           stop();
-           return;
+           config.codec = "av01.0.08M.10.0.112.09.16.09.0" // AV1 Main Profile, level 4.0, Main tier, 10-bit content, non-monochrome, with 4:2:0 chroma subsampling
+           config.pt = 5;
+           break;
       }
     
 
       // Transfer the readable stream to the worker, as well as other info from the user interface.
       // NOTE: transferring frameStream and reading it in the worker is more
       // efficient than reading frameStream here and transferring VideoFrames individually.
-      streamWorker.postMessage({ type: "stream", config: config, url: url, streams: {input: inputStream, output: outputStream}}, [inputStream, outputStream]);
+      streamWorker.postMessage({ type: "stream", config: config, streams: {input: inputStream, output: outputStream}}, [inputStream, outputStream]);
 
     } catch(e) {
        addToEventLog(e.name + ": " + e.message, 'fatal');
     }
   }
-
 }, false);

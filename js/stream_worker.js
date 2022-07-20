@@ -1,59 +1,151 @@
 'use strict';
 
-let encoder, decoder, pl;
+let encoder, decoder, pl, started = false, stopped = false;
+let enc_aggregate = {
+  all: [],
+  min: Number.MAX_VALUE,
+  max: 0,
+  avg: 0,
+  sum: 0,
+};
+
+let dec_aggregate = {
+  all: [],
+  min: Number.MAX_VALUE,
+  max: 0,
+  avg: 0,
+  sum: 0,
+};
+
+let encqueue_aggregate = {
+  all: [],
+  min: Number.MAX_VALUE,
+  max: 0,
+  avg: 0,
+  sum: 0,
+};
+
+let decqueue_aggregate = {
+  all: [],
+  min: Number.MAX_VALUE,
+  max: 0,
+  avg: 0,
+  sum: 0,
+};
+
+function enc_update(duration) {
+  enc_aggregate.all.push(duration);
+  enc_aggregate.min = Math.min(enc_aggregate.min, duration);
+  enc_aggregate.max = Math.max(enc_aggregate.max, duration);
+  enc_aggregate.sum += duration;
+}
+
+function encqueue_update(duration) {
+  encqueue_aggregate.all.push(duration);
+  encqueue_aggregate.min = Math.min(encqueue_aggregate.min, duration);
+  encqueue_aggregate.max = Math.max(encqueue_aggregate.max, duration);
+  encqueue_aggregate.sum += duration;
+}
+
+function enc_report() {
+  enc_aggregate.all.sort();
+  const len = enc_aggregate.all.length;
+  const half = len >> 1;
+  const median = len % 2 === 1 ? enc_aggregate.all[len >> 1] : (enc_aggregate.all[half - 1] + enc_aggregate.all[half]) / 2;
+  return {
+     count: len,
+     min: enc_aggregate.min,
+     max: enc_aggregate.max,
+     avg: enc_aggregate.sum / len,
+     median,
+  };
+}
+
+function encqueue_report() {
+  encqueue_aggregate.all.sort();
+  const len = encqueue_aggregate.all.length;
+  const half = len >> 1;
+  const median = len % 2 === 1 ? encqueue_aggregate.all[len >> 1] : (encqueue_aggregate.all[half - 1] + encqueue_aggregate.all[half]) / 2;
+  return {
+     count: len,
+     min: encqueue_aggregate.min,
+     max: encqueue_aggregate.max,
+     avg: encqueue_aggregate.sum / len,
+     median,
+  };
+}
+
+function dec_update(duration) {
+   dec_aggregate.all.push(duration);
+   dec_aggregate.min = Math.min(dec_aggregate.min, duration);
+   dec_aggregate.max = Math.max(dec_aggregate.max, duration);
+   dec_aggregate.sum += duration;
+}
+
+function dec_report() {
+  dec_aggregate.all.sort();
+  const len  = dec_aggregate.all.length;
+  const half = len >> 1;
+  const median = len % 2 === 1 ? dec_aggregate.all[len >> 1] : (dec_aggregate.all[half - 1] + dec_aggregate.all[half]) / 2;
+  return {
+     count: len,
+     min: dec_aggregate.min,
+     max: dec_aggregate.max,
+     avg: dec_aggregate.sum / len,
+     median,
+  };
+}
+
+function decqueue_update(duration) {
+   decqueue_aggregate.all.push(duration);
+   decqueue_aggregate.min = Math.min(decqueue_aggregate.min, duration);
+   decqueue_aggregate.max = Math.max(decqueue_aggregate.max, duration);
+   decqueue_aggregate.sum += duration;
+}
+
+function decqueue_report() {
+  decqueue_aggregate.all.sort();
+  const len  = decqueue_aggregate.all.length;
+  const half = len >> 1;
+  const median = len % 2 === 1 ? decqueue_aggregate.all[len >> 1] : (decqueue_aggregate.all[half - 1] + decqueue_aggregate.all[half]) / 2;
+  return {
+     count: len,
+     min: decqueue_aggregate.min,
+     max: decqueue_aggregate.max,
+     avg: decqueue_aggregate.sum / len,
+     median,
+  };
+}
 
 self.addEventListener('message', async function(e) {
+  if (stopped) return;
   // In this demo, we expect at most two messages, one of each type.
   let type = e.data.type;
-  let transport;
 
   if (type == "stop") {
     self.postMessage({text: 'Stop message received.'});
-    pl.stop();
+    if (started) pl.stop();
     return;
   } else if (type != "stream"){
     self.postMessage({severity: 'fatal', text: 'Invalid message received.'});
     return;
   }
   // We received a "stream" event
-
   self.postMessage({text: 'Stream event received.'});
 
-  // Create WebTransport
   try {
-    transport = new WebTransport(e.data.url);
-    self.postMessage({text: 'Initiating connection...'});
+    pl = new pipeline(e.data);
+    pl.start();
   } catch (e) {
-    self.postMessage({severity: 'fatal', text: 'Failed to create connection object: ' + e.message});
+    self.postMessage({severity: 'fatal', text: 'Pipeline creation failed: ' + e.message})
     return;
   }
-
-  try {
-    await transport.ready;
-    self.postMessage({text: 'Connection ready.'});
-    pl = new pipeline(e.data, transport);
-    pl.start(); 
-  } catch (e) {
-    self.postMessage({severity: 'fatal', text: 'Connection failed: ' + e.message})
-    return;
-  }
-
-  try {
-    await transport.closed;
-    self.postMessage({text: 'Connection closed normally.'});
-  } catch (e) {
-    self.postMessage({severity: 'fatal', text: 'Connection closed abruptly: ' + e.message});
-    pl.stop();
-    return;
-  } 
-
 }, false);
 
 class pipeline {
 
-   constructor(eventData, transport) {
+   constructor(eventData) {
      this.stopped = false;
-     this.transport = transport;
      this.inputStream = eventData.streams.input;
      this.outputStream = eventData.streams.output;
      this.config = eventData.config;
@@ -84,9 +176,10 @@ Header format:
 PT = payload type:
   x00 = Decoder Configuration
   x01 = H.264
-  x02 = VP8
-  x03 = VP9
-  x04 = AV1
+  x02 = H.265
+  x03 = VP8
+  x04 = VP9
+  x05 = AV1
 S, E, I, D, B, TID, LID defined in draft-ietf-avtext-framemarking
    I = 1 means chunk.type == 'key', 0 means chunk.type == 'delta'
    TID = chunk.temporalLayerId
@@ -238,9 +331,9 @@ SSRC = this.config.ssrc
                 if(decoderSupport.supported) {
                   this.decoder.configure(decoderSupport.config);
                   self.postMessage({text: 'Decoder successfully configured:\n' + JSON.stringify(decoderSupport.config)});
-                  self.postMessage({text: 'Decoder state: ' + JSON.stringify(this.decoder.state)});
+                 // self.postMessage({text: 'Decoder state: ' + JSON.stringify(this.decoder.state)});
                 } else {
-                 self.postMessage({severity: 'fatal', text: 'Config not supported:\n' + JSON.stringify(decoderSupport.config)});
+                self.postMessage({severity: 'fatal', text: 'Config not supported:\n' + JSON.stringify(decoderSupport.config)});
                 }
               })
               .catch((e) => {
@@ -248,8 +341,14 @@ SSRC = this.config.ssrc
               })
            } else {
              try {
-               self.postMessage({text: 'size: ' + chunk.byteLength + ' seq: ' + chunk.seqNo + ' kf: ' + chunk.keyframeIndex + ' delta: ' + chunk.deltaframeIndex + ' dur: ' + chunk.duration + ' ts: ' + chunk.timestamp + ' ssrc: ' + chunk.ssrc + ' pt: ' + chunk.pt + ' tid: ' + chunk.temporalLayerId + ' type: ' + chunk.type});
+              // self.postMessage({text: 'size: ' + chunk.byteLength + ' seq: ' + chunk.seqNo + ' kf: ' + chunk.keyframeIndex + ' delta: ' + chunk.deltaframeIndex + ' dur: ' + chunk.duration + ' ts: ' + chunk.timestamp + ' ssrc: ' + chunk.ssrc + ' pt: ' + chunk.pt + ' tid: ' + chunk.temporalLayerId + ' type: ' + chunk.type});
+               const queue = this.decoder.decodeQueueSize;
+               decqueue_update(queue);
+               const before = performance.now();
                this.decoder.decode(chunk);
+               const after = performance.now();
+               const duration = after - before;
+               dec_update(duration);
              } catch (e) {
                self.postMessage({severity: 'fatal', text: 'Derror size: ' + chunk.byteLength + ' seq: ' + chunk.seqNo + ' kf: ' + chunk.keyframeIndex + ' delta: ' + chunk.deltaframeIndex + ' dur: ' + chunk.duration + ' ts: ' + chunk.timestamp + ' ssrc: ' + chunk.ssrc + ' pt: ' + chunk.pt + ' tid: ' + chunk.temporalLayerId + ' type: ' + chunk.type});
                self.postMessage({severity: 'fatal', text: `Catch Decode error: ${e.message}`});
@@ -271,9 +370,9 @@ SSRC = this.config.ssrc
          this.encoder = encoder = new VideoEncoder({
            output: (chunk, cfg) => {
              if (cfg.decoderConfig) {
-               self.postMessage({text: 'Decoder reconfig!'});
+               // self.postMessage({text: 'Decoder reconfig!'});
                const decoderConfig = JSON.stringify(cfg.decoderConfig);
-               self.postMessage({text: 'Configuration: ' + decoderConfig});
+               // self.postMessage({text: 'Configuration: ' + decoderConfig});
                const configChunk =
                {
                   type: "config",
@@ -311,7 +410,7 @@ SSRC = this.config.ssrc
            if(encoderSupport.supported) {
              this.encoder.configure(encoderSupport.config);
              self.postMessage({text: 'Encoder successfully configured:\n' + JSON.stringify(encoderSupport.config)});
-             self.postMessage({text: 'Encoder state: ' + JSON.stringify(this.encoder.state)});
+             // self.postMessage({text: 'Encoder state: ' + JSON.stringify(this.encoder.state)});
            } else {
              self.postMessage({severity: 'fatal', text: 'Config not supported:\n' + JSON.stringify(encoderSupport.config)});
            }
@@ -328,10 +427,16 @@ SSRC = this.config.ssrc
            try {
              if (this.encoder.state != "closed") {
                if (this.frameCounter % 20 == 0) {
-                 self.postMessage({text: 'Encoded 20 frames'});
+                 // self.postMessage({text: 'Encoded 20 frames'});
                }
+               const queue = this.encoder.encodeQueueSize;
+               encqueue_update(queue);
+               const before = performance.now();
                this.encoder.encode(frame, { keyFrame: insert_keyframe });
-             }
+               const after = performance.now();
+               const duration = after - before;
+               enc_update(duration);
+             } 
            } catch(e) {
              self.postMessage({severity: 'fatal', text: 'Encoder Error: ' + e.message});
            }
@@ -342,31 +447,32 @@ SSRC = this.config.ssrc
    }
 
    stop() {
+     const enc_stats = enc_report();
+     const encqueue_stats = encqueue_report();
+     const dec_stats = dec_report();
+     const decqueue_stats = decqueue_report();
+     self.postMessage({severity: 'info', text: 'Encoder Time report: ' + JSON.stringify(enc_stats)});
+     self.postMessage({severity: 'info', text: 'Encoder Queue report: ' + JSON.stringify(encqueue_stats)});
+     self.postMessage({security: 'info', text: 'Decoder Time report: ' + JSON.stringify(dec_stats)});
+     self.postMessage({severity: 'info', text: 'Decoder Queue report: ' + JSON.stringify(decqueue_stats)});
+     if (stopped) return;
+     stopped = true;
      this.stopped = true;
      self.postMessage({severity: 'fatal', text: 'stop() called'});
      // TODO: There might be a more elegant way of closing a stream, or other
      // events to listen for.
      if (encoder.state != "closed") encoder.close();
      if (decoder.state != "closed") decoder.close();
-     this.transport.close();
-     self.postMessage({severity: 'fatal', text: "stop(): transport, frame, encoder and decoder closed"});
+     self.postMessage({severity: 'fatal', text: "stop(): frame, encoder and decoder closed"});
      return;
    }
 
    async start()
    {
+     if (stopped) return;
+     started = true;
      let duplexStream, readStream, writeStream;
-     // Open a bidirectional stream
-     try {
-        duplexStream = await this.transport.createBidirectionalStream();
-        readStream = duplexStream.readable;
-        writeStream = duplexStream.writable;
-        self.postMessage ({text: 'Bidirectional stream created.'});
-     } catch (e) {
-       self.postMessage({severity: 'fatal', text: 'Bidirectional stream creation failed: ' + e.message});
-       stop();
-       return;
-     }
+     self.postMessage({text: 'Start method called.'});
      try { 
        this.inputStream
            .pipeThrough(this.EncodeVideoStream(self,this.config))
