@@ -416,7 +416,7 @@ SSRC = this.config.ssrc
            }
          })
          .catch((e) => {
-            self.postMessage({severity: 'fatal', text: `Configuration error: ${e.message}`);
+            self.postMessage({severity: 'fatal', text: `Configuration error: ${e.message}`});
          })
        },
        transform(frame, controller) {
