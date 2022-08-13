@@ -137,7 +137,7 @@ self.addEventListener('message', async function(e) {
     pl = new pipeline(e.data);
     pl.start();
   } catch (e) {
-    self.postMessage({severity: 'fatal', text: 'Pipeline creation failed: ' + e.message})
+    self.postMessage({severity: 'fatal', text: `Pipeline creation failed: ${e.message}`})
     return;
   }
 }, false);
@@ -277,7 +277,7 @@ SSRC = this.config.ssrc
          const pt =  B2;
          const tid = (B1 & 0xE0) >> 5;
          const i = (B1 & 0x04) >> 2;
-         const seqNo = readUInt32(chunk, 4)
+         const seqNo = readUInt32(chunk, 4);
          const keyframeIndex   = readUInt32(chunk, 8);
          const deltaframeIndex = readUInt32(chunk, 12);
          const timestamp = readUInt64(chunk, 16);
@@ -337,7 +337,7 @@ SSRC = this.config.ssrc
                 }
               })
               .catch((e) => {
-                 self.postMessage({severity: 'fatal', text: 'Configuration error: ' + e.message});
+                 self.postMessage({severity: 'fatal', text: `Configuration error: ${e.message}`});
               })
            } else {
              try {
@@ -416,7 +416,7 @@ SSRC = this.config.ssrc
            }
          })
          .catch((e) => {
-            self.postMessage({severity: 'fatal', text: 'Configuration error: ' + e.message});
+            self.postMessage({severity: 'fatal', text: `Configuration error: ${e.message}`);
          })
        },
        transform(frame, controller) {
@@ -463,7 +463,7 @@ SSRC = this.config.ssrc
      // events to listen for.
      if (encoder.state != "closed") encoder.close();
      if (decoder.state != "closed") decoder.close();
-     self.postMessage({severity: 'fatal', text: "stop(): frame, encoder and decoder closed"});
+     self.postMessage({severity: 'fatal', text: 'stop(): frame, encoder and decoder closed'});
      return;
    }
 
@@ -481,7 +481,7 @@ SSRC = this.config.ssrc
            .pipeThrough(this.DecodeVideoStream(self))
            .pipeTo(this.outputStream);
      } catch (e) {
-       self.postMessage({severity: 'fatal', text: 'start error: ' + e.message});
+       self.postMessage({severity: 'fatal', text: `start error: ${e.message}`});
      }
    }
 }
