@@ -224,8 +224,8 @@ class pipeline {
                controller.enqueue(configChunk); 
              } 
              chunk.temporalLayerId = 0;
-             if (cfg.temporalLayerId) {
-               chunk.temporalLayerId = cfg.temporalLayerId;
+             if (cfg.svc.temporalLayerId) {
+               chunk.temporalLayerId = cfg.svc.temporalLayerId;
              }
              this.seqNo++;
              if (chunk.type == 'key') {
