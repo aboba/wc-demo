@@ -289,10 +289,10 @@ class pipeline {
      const encqueue_stats = encqueue_report();
      const dec_stats = dec_report();
      const decqueue_stats = decqueue_report();
-     self.postMessage({severity: 'info', text: 'Encoder Time report: ' + JSON.stringify(enc_stats)});
-     self.postMessage({severity: 'info', text: 'Encoder Queue report: ' + JSON.stringify(encqueue_stats)});
-     self.postMessage({security: 'info', text: 'Decoder Time report: ' + JSON.stringify(dec_stats)});
-     self.postMessage({severity: 'info', text: 'Decoder Queue report: ' + JSON.stringify(decqueue_stats)});
+     self.postMessage({text: 'Encoder Time report: ' + JSON.stringify(enc_stats)});
+     self.postMessage({text: 'Encoder Queue report: ' + JSON.stringify(encqueue_stats)});
+     self.postMessage({text: 'Decoder Time report: ' + JSON.stringify(dec_stats)});
+     self.postMessage({text: 'Decoder Queue report: ' + JSON.stringify(decqueue_stats)});
      if (stopped) return;
      stopped = true;
      this.stopped = true;
@@ -312,7 +312,7 @@ class pipeline {
      let duplexStream, readStream, writeStream;
      self.postMessage({text: 'Start method called.'});
      try { 
-       this.inputStream
+       await this.inputStream
            .pipeThrough(this.EncodeVideoStream(self,this.config))
            .pipeThrough(this.DecodeVideoStream(self))
            .pipeTo(this.outputStream);
