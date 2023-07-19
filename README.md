@@ -6,4 +6,4 @@ To see the demo live, point your browser to:  https://webrtc.internaut.com/wc/wc
 
 Note: One use of this demo (which does not include network transport) is to compare the performance to the
 demo that adds serialization + sending to the send pipeline and reception + deserialization to the receive
-pipeline.  The demo with transport is in the "wt-demo" repo, and can be seen live at https://webrtc.internaut.com/wc/wtSender7/
+pipeline.  The demo with transport is in the "wt-demo" repo.
