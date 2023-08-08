@@ -6,7 +6,7 @@ let stopped = false;
 let preferredCodec ="VP8";
 let mode = "L1T3";
 let latencyPref = "realtime", bitPref = "variable";
-let hw = "no-preference";
+let encHw = "no-preference", decHw = "no-preference";
 let streamWorker;
 let inputStream, outputStream;
 const rate = document.querySelector('#rate');
@@ -15,7 +15,8 @@ const stopButton = document.querySelector('#stop');
 const codecButtons = document.querySelector('#codecButtons');
 const resButtons = document.querySelector('#resButtons');
 const modeButtons = document.querySelector('#modeButtons');
-const hwButtons = document.querySelector('#hwButtons');
+const decHwButtons = document.querySelector('#decHwButtons');
+const encHwButtons = document.querySelector('#encHwButtons');
 const videoSelect = document.querySelector('select#videoSource');
 const selectors = [videoSelect];
 connectButton.disabled = false;
@@ -131,9 +132,14 @@ function getModeValue(radio) {
   addToEventLog('Mode selected: ' + mode);
 }
 
-function getHwValue(radio) {
-  hw = radio.value;
-  addToEventLog('Hardware Acceleration preference: ' + hw);
+function getDecHwValue(radio) {
+  decHw = radio.value;
+  addToEventLog('Decoder Hardware Acceleration preference: ' + decHw);
+}
+
+function getEncHwValue(radio) {
+  encHw = radio.value;
+  addToEventLog('Encoder Hardware Acceleration preference: ' + encHw);
 }
 
 function stop() {
@@ -191,7 +197,8 @@ document.addEventListener('DOMContentLoaded', async function(event) {
   connectButton.onclick = () => {
     connectButton.disabled = true;
     stopButton.disabled = false;
-    hwButtons.style.display = "none";
+    decHwButtons.style.display = "none";
+    encHwButtons.style.display = "none";
     prefButtons.style.display = "none";
     bitButtons.style.display = "none";
     codecButtons.style.display = "none";
@@ -243,7 +250,8 @@ document.addEventListener('DOMContentLoaded', async function(event) {
         codec: preferredCodec,
         width: ts.width/vConfig.resolutionScale,
         height: ts.height/vConfig.resolutionScale,
-        hardwareAcceleration: hw,
+        hardwareAcceleration: encHw,
+        decHwAcceleration: decHw,
         bitrate: rate, 
         framerate: ts.frameRate/vConfig.framerateScale,
         keyInterval: vConfig.keyInterval,
