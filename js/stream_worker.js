@@ -238,6 +238,7 @@ class pipeline {
      if (len > 1) {
        const encqueue_stats = encqueue_report();
        const decqueue_stats = decqueue_report();
+       self.postMessage({severity: 'chart'});
        self.postMessage({text: 'Encoder Queue report: ' + JSON.stringify(encqueue_stats)});
        self.postMessage({text: 'Decoder Queue report: ' + JSON.stringify(decqueue_stats)});
      }

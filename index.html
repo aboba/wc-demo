@@ -11,7 +11,7 @@
     <meta id="theme-color" name="theme-color" content="#ffffff">
     <base target="_blank">
 
-    <title>WebCodecs in Worker</title>
+    <title>WebCodecs in Worker + RVFC</title>
     <link rel="stylesheet" href="css/main.css">
 
     <style>
@@ -57,7 +57,7 @@
 
 <body>
 <div>
-  <h2>WebCodecs in Worker</h2>
+  <h2>WebCodecs in Worker + RVFC</h2>
 </div>
 
 <textarea id="vLog" style="width: 640px; height: 360px"></textarea>
@@ -153,6 +153,8 @@
    <label for="eightK">8K</label><br>
 </div>
 
+<div id="chart2_div" style="width: 900px; height: 500px;"></div>
+
 <div class="select">
    <label for="videoSource">Video source: </label><select id="videoSource"></select>
 </div>
@@ -164,6 +166,7 @@
 <br/></br>
 <button id="connect">Start</button>
 <button id="stop">Stop</button>
+<script src="https://www.gstatic.com/charts/loader.js"></script>
 <script src="js/main.js"></script>
 </body>
 </html>
