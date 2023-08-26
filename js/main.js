@@ -231,11 +231,17 @@ document.addEventListener('DOMContentLoaded', async function(event) {
     } else {
       // draw the glass-glass latency chart
       metrics_report();
-      const x = e2e.all.map(item => item[0]);
-      const y = e2e.all.map(item => item[1]);
+      const e2eX = e2e.all.map(item => item[0]);
+      const e2eY = e2e.all.map(item => item[1]);
+      const labels = e2e.all.map((item, index) => {
+        return Object.keys(metrics.all[index]).map(key => {
+          return `${key}: ${metrics.all[index][key]}`;
+        }).join('<br>');
+      });
       Plotly.newPlot(chart2_div, [{
-        x,
-        y,
+        x: e2eX,
+        y: e2eY,
+        text: labels,
         mode: 'markers',
         type: 'scatter',
     }], {
