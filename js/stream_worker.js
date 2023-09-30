@@ -252,7 +252,7 @@ class pipeline {
            output: (chunk, cfg) => {
              if (cfg.decoderConfig) {
                cfg.decoderConfig.hardwareAcceleration = config.decHwAcceleration;
-               cfg.decoderConfig.optimizeForLatency = (config.latencyPref == "realtime");
+               cfg.decoderConfig.optimizeForLatency = (config.latencyMode == "realtime");
                const decoderConfig = JSON.stringify(cfg.decoderConfig);
                self.postMessage({text: 'Configuration: ' + decoderConfig});
                const configChunk =
