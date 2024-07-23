@@ -393,7 +393,8 @@ document.addEventListener('DOMContentLoaded', async function(event) {
           config.pt = 1;
           break;
         case "H265":
-          config.codec = "hvc1.1.6.L123.00"; // Main profile, level 4.1, main Tier
+          // config.codec = "hvc1.1.6.L123.00"; // Main profile, level 4.1, main Tier
+          config.codec = "hev1.1.6.L93.B0"; // Main profile, level 3.1, up to 1280 x 720@33.7
           config.hevc = { format: "annexb" };
           config.pt = 2;
           break;
