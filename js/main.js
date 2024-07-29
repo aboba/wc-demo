@@ -64,7 +64,7 @@ function metrics_report() {
   //addToEventLog('Metrics dump: ' + JSON.stringify(metrics.all));
   const len = metrics.all.length;
   if (len < 2) return;
-  for (let i = 1; i < len ; i++ ) {
+  for (let i = 0; i < len ; i++ ) {
     if (metrics.all[i].output == 1) {
       const frameno = metrics.all[i].presentedFrames;
       const g2g = Math.max(0, metrics.all[i].expectedDisplayTime - metrics.all[i].captureTime);
@@ -80,7 +80,7 @@ function metrics_report() {
   }
   // addToEventLog('E2E Data dump: ' + JSON.stringify(e2e.all));
   return {
-     count: metrics.all.length
+     count: e2e.all.length
   };
 }
 
