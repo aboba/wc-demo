@@ -59,7 +59,7 @@ function metrics_update(data) {
 
 function metrics_report() {
   metrics.all.sort((a, b) =>  {
-    return (100000 * (a.mediaTime - b.mediaTime) + a.output - b.output);
+    return (100000 * (b.mediaTime - a.mediaTime) + b.output - a.output);
   });
   //addToEventLog('Metrics dump: ' + JSON.stringify(metrics.all));
   const len = metrics.all.length;
