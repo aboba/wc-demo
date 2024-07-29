@@ -61,25 +61,26 @@ function metrics_report() {
   metrics.all.sort((a, b) =>  {
     return (100000 * (a.mediaTime - b.mediaTime) + a.output - b.output);
   });
+  //addToEventLog('Metrics dump: ' + JSON.stringify(metrics.all));
   const len = metrics.all.length;
-  let j = 0;
-  for (let i = 0; i < len ; i++ ) {
+  if (len < 2) return;
+  for (let i = 1; i < len ; i++ ) {
     if (metrics.all[i].output == 1) {
       const frameno = metrics.all[i].presentedFrames;
-      const g2g = Math.max(0,metrics.all[i].expectedDisplayTime - metrics.all[i-1].captureTime);
+      const g2g = Math.max(0, metrics.all[i].expectedDisplayTime - metrics.all[i].captureTime);
       const mediaTime = metrics.all[i].mediaTime;
-      const captureTime = metrics.all[i-1].captureTime;
+      const captureTime = metrics.all[i].captureTime;
       const expectedDisplayTime = metrics.all[i].expectedDisplayTime;
-      const delay = metrics.all[i].expectedDisplayTime - metrics.all[i-1].expectedDisplayTime;
+      const delay = metrics.all[i].expectedDisplayTime - metrics.all[i].expectedDisplayTime;
       const data = [frameno, g2g];
       const info = {frameno: frameno, g2g: g2g, mediaTime: mediaTime, captureTime: captureTime, expectedDisplayTime: expectedDisplayTime, delay: delay};
       e2e.all.push(data);
       display_metrics.all.push(info);
     }
   }
-  // addToEventLog('Data dump: ' + JSON.stringify(e2e.all));
+  // addToEventLog('E2E Data dump: ' + JSON.stringify(e2e.all));
   return {
-     count: e2e.all.length
+     count: metrics.all.length
   };
 }
 
