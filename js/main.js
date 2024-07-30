@@ -62,7 +62,6 @@ function metrics_report() {
     return (100000 * (b.mediaTime - a.mediaTime) + b.output - a.output);
   });
   const len = metrics.all.length;
-  let j = 0;
   for (let i = 0; i < len ; i++ ) {
     if (metrics.all[i].output == 1) {
       const frameno = metrics.all[i].presentedFrames;
