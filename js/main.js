@@ -69,9 +69,8 @@ function metrics_report() {
       const expectedDisplayTime = metrics.all[i].expectedDisplayTime;
       const g2g = Math.max(0,expectedDisplayTime - captureTime);
       const mediaTime = metrics.all[i].mediaTime;
-      const delay = metrics.all[i].expectedDisplayTime - metrics.all[i-1].expectedDisplayTime;
       const data = [frameno, g2g];
-      const info = {frameno: frameno, g2g: g2g, mediaTime: mediaTime, captureTime: captureTime, expectedDisplayTime: expectedDisplayTime, delay: delay};
+      const info = {frameno: frameno, g2g: g2g, mediaTime: mediaTime, captureTime: captureTime, expectedDisplayTime: expectedDisplayTime};
       e2e.all.push(data);
       display_metrics.all.push(info);
     }
